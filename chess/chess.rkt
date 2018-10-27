@@ -67,7 +67,7 @@
 
     ;; The on-display-size method is q called when the canvas changes size, and inside it we can
     ;; iterate over all the snips in the pasteboard and simply call position-piece for each one.
-    (define (on-display-size)
+    (define/augment (on-display-size)
       (send this begin-edit-sequence)
       (let loop ([snip (send this find-first-snip)])
         (when snip
