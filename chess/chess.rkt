@@ -22,8 +22,8 @@
     
     (define/override (get-extent dc x y width height descent space lspace rspace)
       (when width (set-box! width size))
-      (when height (set-box! width size))
-      (when descent (set-box! space 0.0))
+      (when height (set-box! height size))
+      (when descent (set-box! descent 0.0))
       (when space (set-box! space 0.0))
       (when lspace (set-box! lspace 0.0))
       (when rspace (set-box! rspace 0.0)))
@@ -35,12 +35,12 @@
         (send dc get-text-extent glyph font #t))
       (let ((ox (/ (- size glyph-width) 2))
             (oy (/ (- size glyph-height 2))))
-       (send dc draw-text glyph (+ x ox) (+ y oy))))
- ))
+        (send dc draw-text glyph (+ x ox) (+ y oy))))
+    ))
 
-; The chess game uses a “rank” and “file” coordinate system, where the rank represents the row
-; on the board and it is numbered from 1 to 8, 1 being at the bottom, while the file are the columns
-; of the board, labeled using letters from “a” to “h”.
+;; The chess game uses a “rank” and “file” coordinate system, where the rank represents the row
+;; on the board and it is numbered from 1 to 8, 1 being at the bottom, while the file are the columns
+;; of the board, labeled using letters from “a” to “h”.
 
 (define chess-piece-data
   (hash
@@ -65,59 +65,72 @@
     (define/augment (after-insert chess-piece . rest)
       (position-piece this chess-piece))
 
-    ; position-piece takes a chess piece, finds the x, y coordinate for it on the chess board based on the location
-    ; stored inside the snip and moves the piece to that location using the pasteboard%s move-to method.
-    ; This function calculates the position based on the current canvas width and height, rather than pre-calculating
-    ; the square positions, so it will work correctly regardless of the size of the board, or even if it is invoked when
-    ; the size of the board changes
-    
-    (define (position-piece board piece)
-      (define-values (canvas-width canvas-height) ; get the size of the canvas
-        (let ((c (send board get-canvas)))
-          (send c get-size)))
-      (define-values (square-width square-height)
-        (values (/ canvas-width 8) (/ canvas-height 8)))
-      (define-values (rank file)
-        (location->rank-file (send piece get-location)))
-      (define-values (square-x square-y)
-        (values (* file square-width) (* rank square-height)))
-      (define piece-width (snip-width piece))
-      (define piece-height (snip-height piece))
+    ;; The on-display-size method is q called when the canvas changes size, and inside it we can
+    ;; iterate over all the snips in the pasteboard and simply call position-piece for each one.
+    (define (on-display-size)
+      (send this begin-edit-sequence)
+      (let loop ([snip (send this find-first-snip)])
+        (when snip
+          ;; reposition the piece since the location is stored as text
+          ;; such as (d3) its new coordinates will be calculated to the correct location.
+          (position-piece this snip)
+          (loop (send snip next))))
+      (send this end-edit-sequence))
+    ))
       
-      (send board move-to piece
+    ;; position-piece takes a chess piece, finds the x, y coordinate for it on the chess board based on the location
+    ;; stored inside the snip and moves the piece to that location using the pasteboard%s move-to method.
+    ;; This function calculates the position based on the current canvas width and height, rather than pre-calculating
+    ;;the square positions, so it will work correctly regardless of the size of the board, or even if it is invoked when
+    ;; the size of the board changes
+    
+   (define (position-piece board piece)
+     (define-values (canvas-width canvas-height) ; get the size of the canvas
+       (let ((c (send board get-canvas)))
+          (send c get-size)))
+     (define-values (square-width square-height)
+        (values (/ canvas-width 8) (/ canvas-height 8)))
+     (define-values (rank file)
+        (location->rank-file (send piece get-location)))
+     (define-values (square-x square-y)
+        (values (* file square-width) (* rank square-height)))
+     (define piece-width (snip-width piece))
+     (define piece-height (snip-height piece))
+      
+     (send board move-to piece
             (+ square-x  (/ (- square-width piece-width) 2))
             (+ square-y  (/ (- square-height piece-height) 2))))
 
-    ; The rank-file function used by position-piece, converts a chess board location
-    ; into the row and column of the corresponding square on the board.
-    (define (location->rank-file location)
-      (unless (and (string? location) (= (string-length location) 2))
+    ;; The rank-file function used by position-piece, converts a chess board location
+    ;; into the row and column of the corresponding square on the board.
+   (define (location->rank-file location)
+     (unless (and (string? location) (= (string-length location) 2))
         (raise-argument-error 'location "valid chess position a1..h8" location))
-      (define file
+     (define file
         (index-of '(#\a #\b #\c #\d #\e #\f #\g #\h) (string-ref location 0)))
-      (define rank
+     (define rank
         (index-of '(#\8 #\7 #\6 #\5 #\4 #\3 #\2 #\1) (string-ref location 1)))
-      (unless (and file rank)
+     (unless (and file rank)
         (raise-argument-error 'location "valid chess position at a1 .. h8" location))
-      (values rank file))
+     (values rank file))
 
-    (define (draw-chess-board dc)
-      (define brush (send the-brush-list find-or-create-brush "gray" 'solid))
-      (define pen (send the-pen-list find-or-create-pen "black" 1 'transparent))
-      (define font (send the-font-list find-or-create-font 8 'default 'normal 'normal))
-      (define-values (dc-width dc-height) (send dc get-size))
-      (define cell-width (/ dc-width 8))
-      (define cell-height (/ dc-height 8))
-      (define margin 3)
+   (define (draw-chess-board dc)
+     (define brush (send the-brush-list find-or-create-brush "gray" 'solid))
+     (define pen (send the-pen-list find-or-create-pen "black" 1 'transparent))
+     (define font (send the-font-list find-or-create-font 8 'default 'normal 'normal))
+     (define-values (dc-width dc-height) (send dc get-size))
+     (define cell-width (/ dc-width 8))
+     (define cell-height (/ dc-height 8))
+     (define margin 3)
 
-      (send dc clear)
-      (send dc set-brush brush)
-      (send dc set-pen pen)
-      (send dc set-font font)
+     (send dc clear)
+     (send dc set-brush brush)
+     (send dc set-pen pen)
+     (send dc set-font font)
 
       (for* ([row (in-range 8)] [col (in-range 8)]
-                                #:when (or (and (odd? row) (even? col))
-                                           (and (even? row) (odd? col))))
+              #:when (or (and (odd? row) (even? col))
+                         (and (even? row) (odd? col))))
         (define-values [x y] (values (* col cell-width) (* row cell-height)))
         (send dc draw-rectangle x y cell-width cell-height))
 
@@ -130,27 +143,45 @@
       (for ([(file index) (in-indexed '("a" "b" "c" "d" "e" "f" "g" "h"))])
         (define-values [w h _1 _2] (send dc get-text-extent file font #t))
         (define x (+ (* index cell-width) (- (/ cell-width 2) (/ w 2))))
-        (send dc draw-text file x (- dc-height h margin))))))
+        (send dc draw-text file x (- dc-height h margin))))
                          
   
 
-    ;; A test program for our chess-piece% objects:
+;; A test program for our chess-piece% objects:
 
-    ;; The pasteboard% that will hold and manage the chess pieces
-    (define board (new chess-board%))
-    ;; Toplevel window for our application
-    (define toplevel (new frame% [label "Chess Board"] [width (* 50 8)] [height (* 50 8)]))
-    ;; The canvas which will display the pasteboard contents
-    (define canvas (new editor-canvas%
-                        [parent toplevel]
-                        [style '(no-hscroll no-vscroll)]
-                        [horizontal-inset 0]
-                        [vertical-inset 0]
-                        [editor board]))
-    (send toplevel show #t)
+;; The pasteboard% that will hold and manage the chess pieces
+(define board (new chess-board%))
+;; Toplevel window for our application
+(define toplevel (new frame% [label "Chess Board"] [width (* 50 8)] [height (* 50 8)]))
+;; The canvas which will display the pasteboard contents
+(define canvas (new editor-canvas%
+                    [parent toplevel]
+                    [style '(no-hscroll no-vscroll)]
+                    [horizontal-inset 0]
+                    [vertical-inset 0]
+                    [editor board]))
+(send toplevel show #t)
 
-    ;; Insert one of each of the chess pieces onto the board, so we can see them
-    ;; and drag them around.
-    (for ([id (in-hash-keys chess-piece-data)])
-      (define piece (make-chess-piece id))
-      (send board insert piece (random (* 50 6)) (random (* 50 6))))
+;; a function which loads a chess game onto the board. The game is encoded as a string
+;; with the piece mnemonic followed by its position. For example, “Ra1” means that the white
+;; rook is at square “a1”. The function just parses the string, creates the chess pieces and
+;; inserts them onto the board. Also, the first thing this function does is to clear the board
+;; of previous pieces, by calling the pasteboard%’s clear method
+
+(define initial
+  (string-append
+   "Ra1Nb1Bc1Qd1Ke1Bf1Ng1Rh1"
+   "Pa2Pb2Pc2Pd2Pe2Pf2Pg2Ph2"
+   "pa7pb7pc7pd7pe7pf7pg7ph7"
+   "ra8nb8bc8qd8ke8bf8ng8rh8"))
+
+(define (setup-board board position)
+  (send board clear)
+  (define piece-count (/ (string-length position) 3))
+  (for ([index (in-range piece-count)])
+    (define pos (* index 3))
+    (define name (substring position pos (add1 pos)))
+    (define location (substring position (add1 pos) (+ (add1 pos) 2)))
+    (send board insert (make-chess-piece name location))))
+
+(setup-board board initial)
