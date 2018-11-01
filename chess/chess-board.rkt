@@ -16,7 +16,7 @@
       (when before?
         (draw-chess-board dc)
         (when highlight-location
-          (highlight-square dc highlight-location #f "indianred"))))
+          (highlight-square dc highlight-location #f "Purple"))))
     
     ; chess pieces are added to the chess board, using the insert method, which allows placing a snip at any coordinate,
     ; or at (0, 0) if no coordinates are specified.
@@ -145,8 +145,8 @@
      (define-values (cell-width cell-height) (values (/ dc-width 8)(/ dc-height 8)))
      (send dc draw-rectangle (* file cell-width) (* rank cell-height) cell-width cell-height))
 
-      ;; The rank-file function used by position-piece, converts a chess board location
-    ;; into the row and column of the corresponding square on the board.
+   ;; The rank-file function used by position-piece, converts a chess board location
+   ;; into the row and column of the corresponding square on the board.
    (define (location->rank-file location)
      (unless (and (string? location) (= (string-length location) 2))
         (raise-argument-error 'location "valid chess position a1..h8" location))

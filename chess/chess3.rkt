@@ -3,25 +3,11 @@
 (require "chess-board.rkt")
 
 
-;; The chess game uses a “rank” and “file” coordinate system, where the rank represents the row
-;; on the board and it is numbered from 1 to 8, 1 being at the bottom, while the file are the columns
-;; of the board, labeled using letters from “a” to “h”.
-
-(define chess-piece-data
-  (hash
-   "K" #\u2654 "Q" #\u2655 "R" #\u2656 "B" #\u2657 "N" #\u2658 "P" #\u2659
-   "k" #\u265A "q" #\u265B "r" #\u265C "b" #\u265D "n" #\u265E "p" #\u265F))
-
-(define (make-chess-piece id [location #f])
-  (define glyph (hash-ref chess-piece-data id))
-  (define font (send the-font-list find-or-create-font 30 'default 'normal 'normal))
-  (new chess-piece% [glyph (string glyph)] [font font] [size 45] [location location]))
-
 ;; A test program for our chess-piece% objects:
 ;; The pasteboard% that will hold and manage the chess pieces
 (define board (new chess-board%))
 ;; Toplevel window for our application
-(define toplevel (new frame% [label "Chess Board"] [width (* 50 8)] [height (* 50 8)]))
+(define toplevel (new frame% [label "Chess Board"] [width (* 75 8)] [height (* 75 8)]))
 ;; The canvas which will display the pasteboard contents
 (define canvas (new editor-canvas%
                     [parent toplevel]
@@ -51,6 +37,6 @@
     (define pos (* index 3))
     (define name (substring position pos (add1 pos)))
     (define location (substring position (add1 pos) (+ (add1 pos) 2)))
-    (send board insert (make-chess-piece name location))))
+    (send board insert (send (new chess-piece%) make-chess-piece name location))))
 
 (setup-board board initial)
